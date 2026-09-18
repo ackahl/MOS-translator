@@ -2,11 +2,16 @@
  * Builds data/mos_crosswalk.json from the O*NET Military Crosswalk.
  *
  * Source:  https://www.onetcenter.org/dl_files/2019/military_crosswalk.zip
+ *          (archive contains milx<MMYY>.csv; field definitions are in its "Read Me.pdf")
+ * Origin:  Defense Manpower Data Center, published by O*NET.
  * Licence: O*NET data are provided by the U.S. Department of Labor, Employment and
  *          Training Administration under CC BY 4.0. Attribution is shown in the app footer.
  *
- * The script is a no-op when data/mos_crosswalk.json already exists. Pass --refresh to
- * re-download, or MOS_CROSSWALK_FILE=/path/to/file.csv (or .zip) to build from a local copy.
+ * Only STATUS = "A" (active/current) records that carry at least one O*NET-SOC match are kept.
+ * Obsolete records and records with no civilian match are dropped.
+ *
+ * No-op when data/mos_crosswalk.json exists. --refresh re-downloads.
+ * MOS_CROSSWALK_FILE=/path/to/military_crosswalk.zip (or the .csv) builds from a local copy.
  */
 import AdmZip from "adm-zip";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -19,11 +24,38 @@ const SOURCE_URL = "https://www.onetcenter.org/dl_files/2019/military_crosswalk.
 
 if (existsSync(out) && !process.argv.includes("--refresh")) {
   const n = JSON.parse(readFileSync(out, "utf8")).occupations.length;
-  console.log(`data/mos_crosswalk.json already present (${n} military occupations). Use --refresh to rebuild.`);
+  console.log(`data/mos_crosswalk.json already present (${n} occupations). Use --refresh to rebuild.`);
   process.exit(0);
 }
 
-/** Minimal RFC4180 CSV parser: returns array of arrays. */
+/** SVC code -> [branch, what the code actually is]. Verbatim from the archive's Read Me. */
+const SVC = {
+  A: ["Army", "MOS / Area of Concentration / Reporting Code"],
+  C: ["Coast Guard", "Coast Guard code"],
+  D: ["DoD", "DoD Occupational Conversion Code"],
+  F: ["Air Force", "Air Force Specialty Code (AFSC)"],
+  G: ["Federal civilian", "OPM GS / WG series"],
+  H: ["Space Force", "Enlisted and Commissioned Officer code"],
+  J: ["Army", "Additional Skill Identifier (ASI)"],
+  K: ["Federal civilian", "National Security Personnel System code"],
+  L: ["Space Force", "Prefix code"],
+  M: ["Marine Corps", "Military Occupational Specialty (MOS)"],
+  N: ["Navy", "Enlisted Rating / NEC / NEBC / NOBC"],
+  O: ["Space Force", "Officer Activity Code"],
+  P: ["Navy", "Officer Designator Code"],
+  Q: ["Army", "Special Qualification Identifier (SQI)"],
+  S: ["Navy", "Officer Subspecialty (SSP) code"],
+  U: ["Space Force", "Special Experience Identifier (SEI)"],
+  V: ["Navy", "Officer Additional Qualification Designation (AQD)"],
+  X: ["Air Force", "Prefix code"],
+  Y: ["Air Force", "Special Experience Identifier (SEI)"],
+  Z: ["Air Force", "Officer Activity Code"],
+};
+
+/** MPC code -> Military Personnel Category. Verbatim from the Read Me. */
+const MPC = { E: "Enlisted", O: "Commissioned Officer", W: "Warrant Officer", "-": "Civilian" };
+
+/** RFC4180 CSV parser. Returns array of arrays. */
 function parseCsv(text) {
   const rows = [];
   let row = [];
@@ -58,35 +90,14 @@ function parseCsv(text) {
   return rows.filter((r) => r.some((v) => v.trim() !== ""));
 }
 
-/** Finds a column index by trying each matcher against the normalised headers, in order. */
-function findColumn(headers, matchers, { exclude = [] } = {}) {
-  const norm = headers.map((h) => h.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim());
-  for (const m of matchers) {
-    const idx = norm.findIndex((h) => m.test(h) && !exclude.some((e) => e.test(h)));
-    if (idx !== -1) return idx;
+function csvFromZip(buffer) {
+  const entries = new AdmZip(buffer).getEntries().filter((e) => !e.isDirectory);
+  const csv = entries.find((e) => e.entryName.toLowerCase().endsWith(".csv"));
+  if (!csv) {
+    throw new Error(`No .csv inside the archive. Entries: ${entries.map((e) => e.entryName).join(", ")}`);
   }
-  return -1;
-}
-
-const BRANCH_NAMES = {
-  A: "Army",
-  C: "Coast Guard",
-  F: "Air Force",
-  M: "Marine Corps",
-  N: "Navy",
-  P: "Navy",
-  S: "Navy",
-};
-
-function normaliseBranch(value) {
-  const v = (value ?? "").trim();
-  if (!v) return "Unspecified";
-  const upper = v.toUpperCase();
-  if (BRANCH_NAMES[upper]) return BRANCH_NAMES[upper];
-  for (const name of new Set(Object.values(BRANCH_NAMES))) {
-    if (upper.includes(name.toUpperCase())) return name;
-  }
-  return v;
+  console.log(`Using ${csv.entryName}`);
+  return csv.getData().toString("utf8");
 }
 
 async function loadCsvText() {
@@ -102,57 +113,62 @@ async function loadCsvText() {
   return csvFromZip(Buffer.from(await res.arrayBuffer()));
 }
 
-function csvFromZip(buffer) {
-  const entries = new AdmZip(buffer).getEntries().filter((e) => !e.isDirectory);
-  const csv = entries.find((e) => e.entryName.toLowerCase().endsWith(".csv"));
-  if (!csv) {
-    throw new Error(
-      `No .csv inside the archive. Entries: ${entries.map((e) => e.entryName).join(", ")}`,
-    );
-  }
-  console.log(`Using ${csv.entryName}`);
-  return csv.getData().toString("utf8");
-}
-
 const rows = parseCsv(await loadCsvText());
-const headers = rows[0];
-console.log(`Columns: ${headers.join(" | ")}`);
-
-const col = {
-  branch: findColumn(headers, [/^branch$/, /service/, /branch/]),
-  mocCode: findColumn(headers, [/^moc$/, /moc code/, /military.*code/, /^code$/], {
-    exclude: [/o net/, /onet/, /soc/],
-  }),
-  mocTitle: findColumn(headers, [/moc title/, /military.*title/, /^title$/], {
-    exclude: [/o net/, /onet/, /soc/],
-  }),
-  socCode: findColumn(headers, [/o net soc code/, /onet soc code/, /soc code/, /o net.*code/]),
-  socTitle: findColumn(headers, [/o net soc title/, /onet soc title/, /soc title/, /o net.*title/]),
-};
-
-for (const [name, idx] of Object.entries(col)) {
-  if (idx === -1) {
+const headers = rows[0].map((h) => h.replace(/^﻿/, "").trim());
+const need = ["SVC", "MPC", "MOC", "MOC_TITLE", "STATUS", "ONET1", "ONET1_TITLE"];
+for (const h of need) {
+  if (!headers.includes(h)) {
     throw new Error(
-      `Could not locate the "${name}" column. Headers were: ${headers.join(" | ")}. ` +
-        "Adjust the matchers in findColumn() above.",
+      `Expected column "${h}" is missing. The file layout has changed. Headers: ${headers.join(", ")}`,
     );
   }
-  console.log(`  ${name} -> "${headers[idx]}"`);
 }
+const at = (r, name) => (r[headers.indexOf(name)] ?? "").trim();
+const clean = (v) => (v === "-" ? "" : v);
 
 const byKey = new Map();
-for (const r of rows.slice(1)) {
-  const mocCode = (r[col.mocCode] ?? "").trim();
-  const mocTitle = (r[col.mocTitle] ?? "").trim();
-  const socCode = (r[col.socCode] ?? "").trim();
-  const socTitle = (r[col.socTitle] ?? "").trim();
-  if (!mocCode || !socCode) continue;
+let skippedObsolete = 0;
+let skippedNoMatch = 0;
+let skippedUnknownSvc = 0;
 
-  const branch = normaliseBranch(r[col.branch]);
-  const key = `${branch}|${mocCode}|${mocTitle}`;
-  const entry = byKey.get(key) ?? { branch, code: mocCode, title: mocTitle, matches: [] };
-  if (!entry.matches.some((m) => m.code === socCode)) {
-    entry.matches.push({ code: socCode, title: socTitle });
+for (const r of rows.slice(1)) {
+  if (at(r, "STATUS") !== "A") {
+    skippedObsolete++;
+    continue;
+  }
+  const code = clean(at(r, "MOC"));
+  const title = clean(at(r, "MOC_TITLE"));
+  if (!code) continue;
+
+  const matches = [];
+  for (const i of [1, 2, 3, 4]) {
+    const soc = clean(at(r, `ONET${i}`));
+    const socTitle = clean(at(r, `ONET${i}_TITLE`));
+    if (soc) matches.push({ code: soc, title: socTitle });
+  }
+  if (matches.length === 0) {
+    skippedNoMatch++;
+    continue;
+  }
+
+  const svc = at(r, "SVC");
+  if (!SVC[svc]) {
+    skippedUnknownSvc++;
+    continue;
+  }
+  const [branch, codeType] = SVC[svc];
+
+  const key = `${svc}|${code}|${title}`;
+  const entry = byKey.get(key) ?? {
+    branch,
+    codeType,
+    category: MPC[at(r, "MPC")] ?? "",
+    code,
+    title,
+    matches: [],
+  };
+  for (const m of matches) {
+    if (!entry.matches.some((x) => x.code === m.code)) entry.matches.push(m);
   }
   byKey.set(key, entry);
 }
@@ -161,21 +177,29 @@ const occupations = [...byKey.values()].sort(
   (a, b) => a.branch.localeCompare(b.branch) || a.code.localeCompare(b.code),
 );
 
+const branches = [...new Set(occupations.map((o) => o.branch))].sort();
+
 writeFileSync(
   out,
-  JSON.stringify(
-    {
-      source: SOURCE_URL,
-      generated: new Date().toISOString().slice(0, 10),
-      occupations,
+  JSON.stringify({
+    source: SOURCE_URL,
+    origin: "Defense Manpower Data Center, published by O*NET (U.S. Department of Labor, ETA)",
+    generated: new Date().toISOString().slice(0, 10),
+    counts: {
+      occupations: occupations.length,
+      matches: occupations.reduce((a, o) => a + o.matches.length, 0),
+      skippedObsolete,
+      skippedNoMatch,
+      skippedUnknownSvc,
     },
-    null,
-    2,
-  ),
+    branches,
+    occupations,
+  }),
 );
 
-const branches = [...new Set(occupations.map((o) => o.branch))].sort();
 console.log(
-  `Wrote ${occupations.length} military occupations across ${branches.length} branches ` +
-    `(${branches.join(", ")}) to data/mos_crosswalk.json`,
+  `Wrote ${occupations.length} active occupations across ${branches.length} branches ` +
+    `(${branches.join(", ")}).\n` +
+    `Skipped ${skippedObsolete} obsolete records, ${skippedNoMatch} with no O*NET match, ` +
+    `${skippedUnknownSvc} with an unrecognised service code.`,
 );

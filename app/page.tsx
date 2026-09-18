@@ -1,7 +1,8 @@
 import crosswalk from "../data/mos_crosswalk.json";
 import { Translator } from "../components/Translator";
-import type { Crosswalk } from "../lib/types";
+import type { Crosswalk, CrosswalkMeta } from "../lib/types";
 
 export default function Page() {
-  return <Translator data={crosswalk as Crosswalk} />;
+  const { occupations, ...meta } = crosswalk as Crosswalk;
+  return <Translator meta={meta as CrosswalkMeta} />;
 }

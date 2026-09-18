@@ -4,4 +4,3 @@ out
 .vercel
 .DS_Store
 *.tsbuildinfo
-data/mos_crosswalk.json
