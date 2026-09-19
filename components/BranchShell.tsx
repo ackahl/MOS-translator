@@ -1,10 +1,35 @@
 import Link from "next/link";
 import crosswalk from "../data/mos_crosswalk.json";
 import { ALL, bannerPath, branchSummaries, emblemPath } from "../lib/branches";
-import { branchFill } from "../lib/branchColors";
+import { contours, palette } from "../lib/branchColors";
 import { BranchTabs, type TabItem } from "./BranchTabs";
 import { Translator } from "./Translator";
 import type { Crosswalk, CrosswalkMeta } from "../lib/types";
+
+/** Procedural topographic banner in the branch's two colors. */
+function TopoBanner({ slug }: { slug: string }) {
+  const { base, line } = palette(slug);
+  return (
+    <svg
+      viewBox="0 0 200 900"
+      preserveAspectRatio="xMidYMid slice"
+      className="block h-full w-full"
+      aria-hidden
+    >
+      <rect width="200" height="900" fill={base} />
+      <g fill="none" stroke={line}>
+        {contours(slug).map((c, i) => (
+          <path
+            key={i}
+            d={c.d}
+            strokeWidth={c.index ? 1.6 : 0.8}
+            strokeOpacity={c.index ? 0.55 : 0.28}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
 
 /** Shared layout for the landing view and every branch view. */
 export function BranchShell({ branch, slug }: { branch: string; slug: string }) {
@@ -49,7 +74,7 @@ export function BranchShell({ branch, slug }: { branch: string; slug: string }) 
                 style={{ objectFit: "cover" }}
               />
             ) : (
-              <div className="h-full w-full" style={{ background: branchFill(slug) }} />
+              <TopoBanner slug={slug} />
             )}
           </div>
         </aside>
