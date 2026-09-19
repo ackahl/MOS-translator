@@ -54,9 +54,27 @@ export function BranchShell({ branch, slug }: { branch: string; slug: string }) 
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-7 sm:px-6">
-      <header className="mb-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Military Occupation Translator</h1>
-        <p className="mt-1.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
+      <header className="mb-5 text-center">
+        <p
+          className="text-[11px] font-semibold uppercase"
+          style={{ color: "var(--accent)", letterSpacing: "0.22em" }}
+        >
+          Military Occupation
+        </p>
+        <h1
+          className="mt-0.5 text-[34px] font-bold leading-none sm:text-[42px]"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          Translator
+        </h1>
+        <div
+          className="mx-auto mt-3.5 h-px w-24"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, var(--accent) 50%, transparent)",
+          }}
+        />
+        <p className="mx-auto mt-3 max-w-[640px] text-[13px]" style={{ color: "var(--text-secondary)" }}>
           {meta.counts.occupations.toLocaleString("en-US")} active occupation codes mapped to{" "}
           {meta.counts.matches.toLocaleString("en-US")} civilian occupations by the U.S. Department
           of Labor.
