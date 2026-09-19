@@ -56,14 +56,14 @@ export function BranchShell({ branch, slug }: { branch: string; slug: string }) 
     <div className="mx-auto max-w-[1180px] px-4 py-7 sm:px-6">
       <header className="mb-5 text-center">
         <p
-          className="text-[11px] font-semibold uppercase"
-          style={{ color: "var(--accent)", letterSpacing: "0.22em" }}
+          className="font-title text-[12px] uppercase"
+          style={{ color: "var(--accent)", letterSpacing: "0.26em" }}
         >
           Military Occupation
         </p>
         <h1
-          className="mt-0.5 text-[34px] font-bold leading-none sm:text-[42px]"
-          style={{ letterSpacing: "-0.02em" }}
+          className="font-title mt-1 text-[36px] leading-none sm:text-[46px]"
+          style={{ letterSpacing: "0.01em" }}
         >
           Translator
         </h1>

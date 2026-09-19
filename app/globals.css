@@ -91,6 +91,27 @@ body {
   outline: none;
 }
 
+/* ---- Title ---- */
+
+/*
+  Special Elite, self-hosted from public/fonts. No request to Google on page
+  load, and the build needs no network access. Licensed under the SIL Open
+  Font License 1.1, which requires the licence text to ship alongside the font
+  file - copy OFL.txt from the Google Fonts download into public/fonts.
+*/
+@font-face {
+  font-family: "Special Elite";
+  src: url("/fonts/SpecialElite-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-title {
+  font-family: "Special Elite", "Courier New", ui-monospace, monospace;
+  font-weight: 400;
+}
+
 /* ---- Branch tabs ---- */
 
 .tabstrip {
