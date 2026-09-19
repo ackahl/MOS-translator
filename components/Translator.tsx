@@ -1,21 +1,38 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CrosswalkMeta, MilitaryOccupation, SearchResponse } from "../lib/types";
+import type {
+  CrosswalkMeta,
+  DescribeHit,
+  DescribeResponse,
+  MilitaryOccupation,
+  SearchResponse,
+} from "../lib/types";
+import { DescribeCard } from "./DescribeCard";
 
 const PAGE = 40;
 
-function OccupationCard({ row }: { row: MilitaryOccupation }) {
+function OccupationCard({
+  row,
+  showBranch,
+  index,
+}: {
+  row: MilitaryOccupation;
+  showBranch: boolean;
+  index: number;
+}) {
   return (
-    <article className="card p-4">
+    <article className="card hit rise p-4" style={{ animationDelay: `${Math.min(index, 8) * 28}ms` }}>
       <div className="flex flex-wrap items-baseline gap-2">
-        <span
-          className="rounded px-1.5 py-0.5 text-[11px] font-semibold"
-          style={{ background: "var(--surface-0)", color: "var(--text-secondary)" }}
-        >
-          {row.branch}
-        </span>
-        <h2 className="text-base font-semibold">{row.code}</h2>
+        {showBranch ? (
+          <span
+            className="rounded px-1.5 py-0.5 text-[11px] font-semibold"
+            style={{ background: "var(--surface-0)", color: "var(--text-secondary)" }}
+          >
+            {row.branch}
+          </span>
+        ) : null}
+        <h2 className="text-[17px] font-bold tracking-tight">{row.code}</h2>
         <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
           {row.title}
         </span>
@@ -26,6 +43,12 @@ function OccupationCard({ row }: { row: MilitaryOccupation }) {
         {row.category ? ` · ${row.category}` : ""}
       </p>
 
+      {row.dodTitle || row.motd.length ? (
+        <p className="mt-2 text-[12px]" style={{ color: "var(--text-secondary)" }}>
+          {[row.dodTitle, ...row.motd].filter(Boolean).join("  →  ")}
+        </p>
+      ) : null}
+
       <p className="mt-3 text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
         Civilian occupations ({row.matches.length})
       </p>
@@ -34,7 +57,7 @@ function OccupationCard({ row }: { row: MilitaryOccupation }) {
           <li key={m.code} className="text-[13px]">
             <a
               className="underline underline-offset-2"
-              style={{ color: "var(--series-1)" }}
+              style={{ color: "var(--link)" }}
               href={`https://www.onetonline.org/link/summary/${m.code}`}
               target="_blank"
               rel="noreferrer"
@@ -51,9 +74,17 @@ function OccupationCard({ row }: { row: MilitaryOccupation }) {
   );
 }
 
-export function Translator({ meta }: { meta: CrosswalkMeta }) {
+export function Translator({
+  meta,
+  lockedBranch = null,
+}: {
+  meta: CrosswalkMeta;
+  lockedBranch?: string | null;
+}) {
+  const [mode, setMode] = useState<"code" | "describe">("code");
   const [query, setQuery] = useState("");
-  const [branch, setBranch] = useState("All branches");
+  const [described, setDescribed] = useState<DescribeHit[]>([]);
+  const [branch, setBranch] = useState(lockedBranch ?? "All branches");
   const [limit, setLimit] = useState(PAGE);
   const [data, setData] = useState<SearchResponse>({ total: 0, results: [] });
   const [loading, setLoading] = useState(true);
@@ -66,6 +97,27 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
     const handle = setTimeout(
       () => {
         setLoading(true);
+
+        if (mode === "describe") {
+          if (query.trim().length < 3) {
+            setDescribed([]);
+            setLoading(false);
+            return;
+          }
+          fetch(`/api/describe?q=${encodeURIComponent(query)}&limit=12`)
+            .then((r) => r.json() as Promise<DescribeResponse>)
+            .then((json) => {
+              if (id === seq.current) {
+                setDescribed(json.results);
+                setLoading(false);
+              }
+            })
+            .catch(() => {
+              if (id === seq.current) setLoading(false);
+            });
+          return;
+        }
+
         const url = `/api/search?q=${encodeURIComponent(query)}&branch=${encodeURIComponent(branch)}&limit=${limit}`;
         fetch(url)
           .then((r) => r.json() as Promise<SearchResponse>)
@@ -79,31 +131,47 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
             if (id === seq.current) setLoading(false);
           });
       },
-      query ? 180 : 0,
+      query ? 220 : 0,
     );
     return () => clearTimeout(handle);
-  }, [query, branch, limit]);
+  }, [mode, query, branch, limit]);
 
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
-      <header>
-        <h1 className="text-xl font-semibold">Military Occupation Translator</h1>
-        <p className="mt-1 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-          Enter a military occupation code or title to see the civilian occupations the U.S.
-          Department of Labor maps it to. {meta.counts.occupations.toLocaleString("en-US")} active
-          military and federal codes indexed, carrying{" "}
-          {meta.counts.matches.toLocaleString("en-US")} occupation matches.
-        </p>
-      </header>
+    <div>
+      <div className="tabstrip mb-3" style={{ display: "inline-flex" }} role="tablist">
+        <button
+          role="tab"
+          aria-selected={mode === "code"}
+          className={`tab ${mode === "code" ? "tab-active" : ""}`}
+          onClick={() => {
+            setMode("code");
+            setLimit(PAGE);
+          }}
+        >
+          Code or title
+        </button>
+        <button
+          role="tab"
+          aria-selected={mode === "describe"}
+          className={`tab ${mode === "describe" ? "tab-active" : ""}`}
+          onClick={() => setMode("describe")}
+        >
+          Describe your work
+        </button>
+      </div>
 
-      <div className="card mt-5 flex flex-wrap items-end gap-3 p-3">
+      <div className="card flex flex-wrap items-end gap-3 p-3">
         <label className="flex min-w-[240px] flex-1 flex-col gap-1">
           <span className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-            Code or title
+            {mode === "code" ? "Code or title" : "What did you actually do?"}
           </span>
           <input
             className="control"
-            placeholder="e.g. 3043, 92Y, 2A011, supply"
+            placeholder={
+              mode === "code"
+                ? "e.g. 3043, 92Y, 2A011, supply"
+                : "e.g. managed inventory for a supply section"
+            }
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -111,6 +179,7 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
             }}
           />
         </label>
+        {lockedBranch || mode === "describe" ? null : (
         <label className="flex flex-col gap-1">
           <span className="text-[11px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
             Branch
@@ -130,8 +199,34 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
             ))}
           </select>
         </label>
+        )}
       </div>
 
+      {mode === "describe" ? (
+        <>
+          <p className="mt-4 text-[12px]" style={{ color: "var(--text-muted)" }}>
+            {query.trim().length < 3
+              ? "Describe a duty in your own words. Every result shows the O*NET task statements it matched."
+              : loading
+                ? "Searching…"
+                : `${described.length} civilian occupations matched`}
+          </p>
+          <div className="mt-2 space-y-3">
+            {described.map((hit, i) => (
+              <DescribeCard key={hit.code} hit={hit} index={i} />
+            ))}
+            {!loading && query.trim().length >= 3 && described.length === 0 ? (
+              <div
+                className="card p-6 text-center text-[13px]"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Nothing matched. Try describing the work with different words.
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
       <p className="mt-4 text-[12px]" style={{ color: "var(--text-muted)" }}>
         {loading
           ? "Searching…"
@@ -141,8 +236,13 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
       </p>
 
       <div className="mt-2 space-y-3">
-        {data.results.map((row) => (
-          <OccupationCard key={`${row.branch}-${row.code}-${row.title}`} row={row} />
+        {data.results.map((row, i) => (
+          <OccupationCard
+            key={`${row.branch}-${row.code}-${row.title}`}
+            row={row}
+            showBranch={!lockedBranch}
+            index={i}
+          />
         ))}
         {!loading && data.total === 0 ? (
           <div className="card p-6 text-center text-[13px]" style={{ color: "var(--text-secondary)" }}>
@@ -152,10 +252,12 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
       </div>
 
       {data.total > data.results.length ? (
-        <button className="control mt-4" onClick={() => setLimit(limit + PAGE)}>
+        <button className="control hit mt-4" onClick={() => setLimit(limit + PAGE)}>
           Show more
         </button>
       ) : null}
+        </>
+      )}
 
       <footer className="mt-8 text-[12px]" style={{ color: "var(--text-muted)" }}>
         Source: O*NET Military Crosswalk, built {meta.generated} from{" "}
@@ -168,6 +270,6 @@ export function Translator({ meta }: { meta: CrosswalkMeta }) {
         trademark of the U.S. Department of Labor, Employment and Training Administration. Data used
         under CC BY 4.0.
       </footer>
-    </main>
+    </div>
   );
 }

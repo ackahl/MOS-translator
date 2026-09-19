@@ -9,6 +9,10 @@ export type MilitaryOccupation = {
   category: string;
   code: string;
   title: string;
+  /** DoD Occupational Conversion title, e.g. "Supply Administration". */
+  dodTitle: string;
+  /** Military Occupational and Training Data groupings for this code. */
+  motd: string[];
   matches: SocMatch[];
 };
 
@@ -32,3 +36,15 @@ export type SearchResponse = {
   total: number;
   results: MilitaryOccupation[];
 };
+
+export type DescribeHit = {
+  code: string;
+  title: string;
+  description: string;
+  evidence: string[];
+  titles: string[];
+  military: { branch: string; code: string; title: string }[];
+  score: number;
+};
+
+export type DescribeResponse = { results: DescribeHit[] };

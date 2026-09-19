@@ -3,48 +3,61 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
-  --surface-0: #f4f3f0;
-  --surface-1: #fcfcfb;
-  --border: #dedcd6;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #75746f;
-  --grid: #e7e5e0;
+  color-scheme: dark;
 
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
+  /* Olive and gold palette, sampled from the reference badge art. */
+  --surface-0: #0f110a; /* page */
+  --surface-1: #212316; /* cards, tab strip */
+  --border: #3e4027;
+  --text-primary: #e8e6da;
+  --text-secondary: #b3b19d;
+  --text-muted: #8d8c76;
+  --grid: #2b2d1d;
 
-  --status-good: #1baf7a;
-  --status-warning: #eda100;
-  --status-critical: #e34948;
+  --banner: #515536; /* sage, the banner base */
+  --banner-line: rgba(191, 170, 101, 0.16);
+
+  --accent: #c69916; /* gold */
+  --accent-ink: #1a1c12;
+  --accent-glow: rgba(198, 153, 22, 0.28);
+  --link: #bfaa65; /* khaki */
+
+  --series-1: #c69916;
+  --series-2: #9a7b3a;
+  --series-3: #726942;
+
+  --status-good: #7f8f4a;
+  --status-warning: #c69916;
+  --status-critical: #b4553a;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --surface-0: #121211;
-    --surface-1: #1a1a19;
-    --border: #383835;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #96958c;
-    --grid: #2b2b29;
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
 
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
+    --surface-0: #e9e5d6;
+    --surface-1: #f6f3e8;
+    --border: #cfc9b1;
+    --text-primary: #21230f;
+    --text-secondary: #4e5138;
+    --text-muted: #73765c;
+    --grid: #dcd7c3;
 
-    --status-good: #199e70;
-    --status-warning: #c98500;
-    --status-critical: #e66767;
+    --banner: #515536;
+    --banner-line: rgba(255, 250, 230, 0.18);
+
+    --accent: #7a5d07;
+    --accent-ink: #fbf9f0;
+    --accent-glow: rgba(122, 93, 7, 0.22);
+    --link: #6b5512;
+
+    --series-1: #7a5d07;
+    --series-2: #726942;
+    --series-3: #515536;
+
+    --status-good: #4f6129;
+    --status-warning: #8a6a0a;
+    --status-critical: #8d3b24;
   }
 }
 
@@ -76,4 +89,110 @@ body {
 
 .recharts-surface:focus {
   outline: none;
+}
+
+/* ---- Branch tabs ---- */
+
+.tabstrip {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.tabstrip::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.tab:hover {
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+
+.tab-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+.tab-active:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tab-count {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-0);
+  color: var(--text-muted);
+}
+
+.tab-active .tab-count {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--accent-ink);
+}
+
+/* ---- Entrance motion ---- */
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: riseIn 260ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .tab,
+  .tab-active {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}
+
+.hit {
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.hit:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }

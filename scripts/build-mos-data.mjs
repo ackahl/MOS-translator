@@ -34,10 +34,10 @@ const SVC = {
   C: ["Coast Guard", "Coast Guard code"],
   D: ["DoD", "DoD Occupational Conversion Code"],
   F: ["Air Force", "Air Force Specialty Code (AFSC)"],
-  G: ["Federal civilian", "OPM GS / WG series"],
+  G: ["Federal Civilian", "OPM GS / WG series"],
   H: ["Space Force", "Enlisted and Commissioned Officer code"],
   J: ["Army", "Additional Skill Identifier (ASI)"],
-  K: ["Federal civilian", "National Security Personnel System code"],
+  K: ["Federal Civilian", "National Security Personnel System code"],
   L: ["Space Force", "Prefix code"],
   M: ["Marine Corps", "Military Occupational Specialty (MOS)"],
   N: ["Navy", "Enlisted Rating / NEC / NEBC / NOBC"],
@@ -115,7 +115,7 @@ async function loadCsvText() {
 
 const rows = parseCsv(await loadCsvText());
 const headers = rows[0].map((h) => h.replace(/^﻿/, "").trim());
-const need = ["SVC", "MPC", "MOC", "MOC_TITLE", "STATUS", "ONET1", "ONET1_TITLE"];
+const need = ["SVC", "MPC", "MOC", "MOC_TITLE", "STATUS", "ONET1", "ONET1_TITLE", "DODOCC_TITLE", "MOTD1_TITLE"];
 for (const h of need) {
   if (!headers.includes(h)) {
     throw new Error(
@@ -125,6 +125,15 @@ for (const h of need) {
 }
 const at = (r, name) => (r[headers.indexOf(name)] ?? "").trim();
 const clean = (v) => (v === "-" ? "" : v);
+
+/** MOTD titles ship in caps ("WAREHOUSING AND DISTRIBUTION SPECIALISTS"). */
+const MINOR = new Set(["and", "or", "of", "the", "for", "in", "to", "a", "an", "with"]);
+const titleCase = (v) =>
+  v.replace(/[A-Za-z']+/g, (w, i) => {
+    const lower = w.toLowerCase();
+    if (i > 0 && MINOR.has(lower)) return lower;
+    return lower[0].toUpperCase() + lower.slice(1);
+  });
 
 const byKey = new Map();
 let skippedObsolete = 0;
@@ -165,8 +174,23 @@ for (const r of rows.slice(1)) {
     category: MPC[at(r, "MPC")] ?? "",
     code,
     title,
+    // DoD Occupational Conversion title, e.g. "Supply Administration".
+    dodTitle: "",
+    // Military Occupational and Training Data groupings, e.g. "Warehousing and
+    // Distribution Specialists". Up to two per row in the source file.
+    motd: [],
     matches: [],
   };
+
+  const dod = clean(at(r, "DODOCC_TITLE"));
+  if (dod && !entry.dodTitle) entry.dodTitle = dod;
+  for (const i of [1, 2]) {
+    const m = clean(at(r, `MOTD${i}_TITLE`));
+    if (m) {
+      const t = titleCase(m);
+      if (!entry.motd.includes(t)) entry.motd.push(t);
+    }
+  }
   for (const m of matches) {
     if (!entry.matches.some((x) => x.code === m.code)) entry.matches.push(m);
   }

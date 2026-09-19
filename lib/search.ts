@@ -5,7 +5,8 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 /**
  * Ranks military occupations against a query.
  * 0 = exact code, 1 = code prefix, 2 = title starts with, 3 = title contains,
- * 4 = matched O*NET occupation title contains. Lower sorts first.
+ * 4 = DoD or MOTD grouping contains, 5 = matched O*NET occupation title contains.
+ * Lower sorts first.
  */
 export function searchOccupations(
   rows: MilitaryOccupation[],
@@ -29,7 +30,12 @@ export function searchOccupations(
     else if (code.startsWith(nq)) rank = 1;
     else if (title.startsWith(lq)) rank = 2;
     else if (title.includes(lq)) rank = 3;
-    else if (row.matches.some((m) => m.title.toLowerCase().includes(lq))) rank = 4;
+    else if (
+      row.dodTitle.toLowerCase().includes(lq) ||
+      row.motd.some((m) => m.toLowerCase().includes(lq))
+    )
+      rank = 4;
+    else if (row.matches.some((m) => m.title.toLowerCase().includes(lq))) rank = 5;
 
     if (rank !== -1) scored.push({ row, rank });
   }
